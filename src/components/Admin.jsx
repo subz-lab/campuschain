@@ -1,16 +1,25 @@
 import { useState } from 'react';
 import { ShieldAlert, Plus, Users, Check, X, Code2 } from 'lucide-react';
+import { mintTokens } from '../lib/api';
 
 export default function Admin() {
   const [amount, setAmount] = useState('');
+  const [recipient, setRecipient] = useState('');
   const [issued, setIssued] = useState(false);
+  const [mintResult, setMintResult] = useState(null);
   const [policyDeploying, setPolicyDeploying] = useState(false);
   const [policyDeployed, setPolicyDeployed] = useState(false);
 
-  const handleIssue = (e) => {
+  const handleIssue = async (e) => {
     e.preventDefault();
-    setIssued(true);
-    setTimeout(() => setIssued(false), 3000);
+    try {
+      const data = await mintTokens(recipient, amount);
+      setMintResult(data);
+      setIssued(true);
+      setTimeout(() => { setIssued(false); setMintResult(null); }, 5000);
+    } catch(err) {
+      setIssued(false);
+    }
   };
 
   const handleDeployPolicy = () => {
@@ -62,7 +71,9 @@ export default function Admin() {
             <label className="text-xs text-gray-400 font-medium mb-1 inline-block">Student Wallet / Roll No.</label>
             <input 
               type="text" 
-              placeholder="e.g. CS-2024-001"
+              placeholder="e.g. jane-student"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
               className="w-full bg-black/40 border border-white/10 rounded-lg py-3 px-4 text-white focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all"
               required
             />
@@ -74,6 +85,13 @@ export default function Admin() {
             {issued ? 'Funds Allocated Successfully!' : 'Allocate Funds'}
           </button>
         </form>
+
+        {mintResult && mintResult.success && (
+          <div className="mt-4 bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-xs flex flex-col gap-1">
+            <div className="flex justify-between"><span className="text-gray-400">Block #</span><span className="font-mono text-white">{mintResult.blockIndex}</span></div>
+            <div className="flex justify-between"><span className="text-gray-400">Tx Hash</span><span className="font-mono text-purple-400">{mintResult.txHash?.slice(0, 16)}...</span></div>
+          </div>
+        )}
       </div>
 
       {/* Smart Policy Deployer */}

@@ -1,27 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowUpRight, QrCode, ArrowDownLeft, Clock, GraduationCap, Ticket } from 'lucide-react';
 import { useParallax } from '../hooks/useParallax';
+import { getWallet } from '../lib/api';
 
 export default function Dashboard({ onNavigate }) {
   const { offset, rotate, handleMouseMove, handleMouseLeave } = useParallax(15);
   
-  const balance = 12500;
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const tokenName = "CampusCoin (CCT)";
   
   // Budget tracker logic
-  const budgetUsed = 850;
   const budgetTotal = 1000;
-  const budgetPercent = (budgetUsed / budgetTotal) * 100;
+
+  useEffect(() => {
+    getWallet('jane-student').then(data => {
+      setBalance(data.balance);
+      setTransactions(data.transactions.slice(0, 5));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const budgetUsed = transactions
+    .filter(tx => tx.sender === 'jane-student')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const budgetPercent = Math.min((budgetUsed / budgetTotal) * 100, 100);
   
   let progressColor = "bg-green-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]";
   if (budgetPercent > 75) progressColor = "bg-yellow-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]";
   if (budgetPercent > 90) progressColor = "bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]";
-
-  const transactions = [
-    { id: 1, name: "Cafe Coffee Day", amount: -120, status: "Success", time: "2h ago", txHash: "0x8f4...b39a", icon: ArrowUpRight, color: "text-red-400", bg: "bg-red-500/10" },
-    { id: 2, name: "Library Fine", amount: -50, status: "Success", time: "1d ago", txHash: "0x1a2...c49f", icon: ArrowUpRight, color: "text-red-400", bg: "bg-red-500/10" },
-    { id: 3, name: "Alex (Split Bill)", amount: +200, status: "Success", time: "2d ago", txHash: "0x9d3...e81c", icon: ArrowDownLeft, color: "text-green-400", bg: "bg-green-500/10" },
-  ];
 
   return (
     <div className="flex flex-col gap-6 pb-24">
@@ -44,7 +52,11 @@ export default function Dashboard({ onNavigate }) {
         <div className="relative z-10 pointer-events-none transition-transform ease-out duration-300" style={{ transform: `translate3d(${offset.x / 2}px, ${offset.y / 2}px, 0)` }}>
           <p className="text-gray-400 font-medium text-sm mb-1">Total Balance</p>
           <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-4xl font-extrabold tracking-tight">₹{balance.toLocaleString()}</span>
+            {loading ? (
+              <div className="h-10 w-40 bg-white/10 rounded animate-pulse"></div>
+            ) : (
+              <span className="text-4xl font-extrabold tracking-tight">₹{balance.toLocaleString()}</span>
+            )}
           </div>
           <div className="inline-flex items-center gap-2 bg-white/5 py-1 px-3 rounded-full border border-white/10">
             <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)] animate-pulse"></span>
@@ -100,7 +112,7 @@ export default function Dashboard({ onNavigate }) {
         <div className="h-2.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
           <div 
             className={`h-full rounded-full transition-all duration-1000 ease-out ${progressColor}`}
-            style={{ width: `${Math.min(budgetPercent, 100)}%` }}
+            style={{ width: `${budgetPercent}%` }}
           ></div>
         </div>
         
@@ -121,21 +133,24 @@ export default function Dashboard({ onNavigate }) {
         </div>
         
         <div className="flex flex-col gap-3">
-          {transactions.map(tx => {
-            const Icon = tx.icon;
+          {loading ? (
+            [1,2,3].map(i => <div key={i} className="glass-panel p-4 h-16 animate-pulse bg-white/5 rounded-2xl"></div>)
+          ) : transactions.map((tx, i) => {
+            const isSent = tx.sender === 'jane-student';
+            const Icon = isSent ? ArrowUpRight : ArrowDownLeft;
             return (
-              <div key={tx.id} className="glass-panel p-4 flex items-center justify-between group hover:bg-white/5 transition-colors cursor-pointer">
+              <div key={i} className="glass-panel p-4 flex items-center justify-between group hover:bg-white/5 transition-colors cursor-pointer">
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.bg} ${tx.color}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isSent ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
                     <Icon size={18} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-sm">{tx.name}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">{tx.time} • Tx: <span className="font-mono text-purple-400/80">{tx.txHash}</span></p>
+                    <h4 className="font-semibold text-sm capitalize">{isSent ? tx.recipient : tx.sender}</h4>
+                    <p className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">Tx: <span className="font-mono text-purple-400/80">{tx.txHash?.slice(0, 10)}...</span></p>
                   </div>
                 </div>
-                <div className={`font-bold ${tx.amount > 0 ? 'text-green-400' : 'text-white'}`}>
-                  {tx.amount > 0 ? '+' : ''}₹{Math.abs(tx.amount)}
+                <div className={`font-bold ${!isSent ? 'text-green-400' : 'text-white'}`}>
+                  {isSent ? '-' : '+'}₹{tx.amount}
                 </div>
               </div>
             );

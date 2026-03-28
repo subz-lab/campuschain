@@ -1,34 +1,30 @@
 import { useState } from 'react';
 import { Send, CheckCircle2, User, Wallet } from 'lucide-react';
+import { sendTransfer, getWallet } from '../lib/api';
 
 export default function SendMoney() {
   const [receiver, setReceiver] = useState('');
   const [amount, setAmount] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [result, setResult] = useState(null);
   
   const balance = 12500;
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!receiver || !amount) return;
     
     setIsSending(true);
-    // Simulate network request
-    setTimeout(() => {
-      setIsSending(false);
-      setIsSuccess(true);
-      
-      // Reset form after delay
-      setTimeout(() => {
-        setIsSuccess(false);
-        setReceiver('');
-        setAmount('');
-      }, 3000);
-    }, 1500);
+    try {
+      const data = await sendTransfer('jane-student', receiver, amount);
+      setResult(data);
+    } catch (err) {
+      setResult({ error: 'Transaction failed' });
+    }
+    setIsSending(false);
   };
 
-  if (isSuccess) {
+  if (result && result.success) {
     return (
       <div className="flex flex-col items-center justify-center h-[70vh] animate-in fade-in zoom-in duration-500">
         <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
@@ -39,18 +35,33 @@ export default function SendMoney() {
         
         <div className="glass-panel p-4 w-full flex flex-col gap-2 shadow-[0_0_20px_rgba(139,92,246,0.1)]">
           <div className="flex justify-between text-xs">
-            <span className="text-gray-400">Network Fee</span>
-            <span className="font-mono text-white">0.001 CCT</span>
+            <span className="text-gray-400">Block #</span>
+            <span className="font-mono text-white">{result.blockIndex}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400">Block Hash</span>
+            <span className="font-mono text-blue-400">{result.blockHash?.slice(0, 16)}...</span>
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-gray-400">Tx Hash</span>
-            <span className="font-mono text-purple-400 cursor-pointer hover:underline">0x8f4d3a9...b39a</span>
+            <span className="font-mono text-purple-400">{result.txHash?.slice(0, 16)}...</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400">Remaining Balance</span>
+            <span className="font-mono text-green-400">₹{result.newBalance}</span>
           </div>
           <hr className="border-white/5 my-1" />
           <button className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors py-1">
             View on CampusScan Explorer ↗
           </button>
         </div>
+
+        <button 
+          onClick={() => { setResult(null); setReceiver(''); setAmount(''); }}
+          className="mt-6 text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          ← Send Another
+        </button>
       </div>
     );
   }
@@ -64,6 +75,12 @@ export default function SendMoney() {
         </p>
       </div>
 
+      {result?.error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium p-3 rounded-lg text-center">
+          {result.error}
+        </div>
+      )}
+
       <form onSubmit={handleSend} className="glass-panel p-6 flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <label className="text-sm font-semibold text-gray-300">Receiver ID or Name</label>
@@ -71,7 +88,7 @@ export default function SendMoney() {
             <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
             <input 
               type="text" 
-              placeholder="e.g. Alex or @alex.c"
+              placeholder="e.g. alex or cafe-coffee-day"
               value={receiver}
               onChange={(e) => setReceiver(e.target.value)}
               className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all"
